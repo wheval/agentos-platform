@@ -459,6 +459,64 @@ export class AuthorityService {
       const now = this.#nowIso();
       const events: AuditEvent[] = [];
 
+      // The window is re-checked here, not just at submission. Submission
+      // checks a budget that nothing has reserved yet: several requests can
+      // each be evaluated against committed=0, all auto-approve, and only
+      // become real spend when their grants are minted. Minting is therefore
+      // the boundary where the budget is actually consumed, and the only place
+      // a re-check closes the gap.
+      //
+      // This runs inside runExclusive, so the read and the mint that depends on
+      // it cannot interleave with another issuance.
+      const spendWindow = policy.constraints.spendWindow;
+
+      if (spendWindow) {
+        const committedMinor = await this.#committedSpend(policy, now);
+        const requestedMinor = request.input.amountMinor;
+
+        if (committedMinor + requestedMinor > spendWindow.maxAmountMinor) {
+          // The request stays approved rather than being denied. The window
+          // rolls and live grants expire, so this is a budget that is currently
+          // exhausted, not a decision that was wrong — the agent can claim once
+          // headroom returns, and until then holds nothing.
+          events.push(
+            createAuditEvent({
+              id: this.#newId("evt"),
+              organizationId: this.#organizationId,
+              actionRequestId: request.id,
+              actor: input.actor,
+              eventType: "capability.issued",
+              outcome: "denied",
+              summary: `Issuance refused: rolling spend window exhausted for ${policy.name}`,
+              metadata: {
+                reasons: "SPEND_WINDOW_EXCEEDED",
+                committedMinor,
+                requestedMinor,
+                windowMaxMinor: spendWindow.maxAmountMinor,
+                windowHours: spendWindow.windowHours,
+              },
+              occurredAt: now,
+            }),
+          );
+
+          await this.#store.appendAuditEvents(events);
+
+          return {
+            ok: false as const,
+            error: {
+              code: "CAPABILITY_DENIED" as const,
+              message: "Issuing this capability would exceed the rolling spend window",
+              details: {
+                reasons: ["SPEND_WINDOW_EXCEEDED"],
+                committedMinor,
+                requestedMinor,
+                windowMaxMinor: spendWindow.maxAmountMinor,
+              },
+            },
+          };
+        }
+      }
+
       const capability = CapabilityGrantSchema.parse({
         id: this.#newId("cap"),
         actionRequestId: request.id,
