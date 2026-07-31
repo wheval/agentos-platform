@@ -20,9 +20,25 @@ const CapabilityUseAttemptSchema = z
 
 export type CapabilityUseAttempt = z.infer<typeof CapabilityUseAttemptSchema>;
 
+export const CAPABILITY_DENIAL_REASONS = [
+  "CAPABILITY_NOT_ACTIVE",
+  "CAPABILITY_NOT_YET_VALID",
+  "CAPABILITY_EXPIRED",
+  "CAPABILITY_USES_EXHAUSTED",
+  "AGENT_SCOPE_MISMATCH",
+  "REQUEST_SCOPE_MISMATCH",
+  "ACTION_SCOPE_MISMATCH",
+  "RESOURCE_SCOPE_MISMATCH",
+  "AMOUNT_SCOPE_EXCEEDED",
+  "CURRENCY_SCOPE_MISMATCH",
+  "COUNTERPARTY_SCOPE_MISMATCH",
+] as const;
+
+export type CapabilityDenialReason = (typeof CAPABILITY_DENIAL_REASONS)[number];
+
 export type CapabilityAuthorization =
   | { authorized: true; reasons: [] }
-  | { authorized: false; reasons: string[] };
+  | { authorized: false; reasons: CapabilityDenialReason[] };
 
 export function authorizeCapabilityUse(
   capabilityInput: CapabilityGrant,
@@ -32,11 +48,12 @@ export function authorizeCapabilityUse(
   const capability = CapabilityGrantSchema.parse(capabilityInput);
   const attempt = CapabilityUseAttemptSchema.parse(attemptInput);
   const now = new Date(nowInput);
-  const reasons: string[] = [];
+  const reasons: CapabilityDenialReason[] = [];
 
   if (capability.status !== "active") reasons.push("CAPABILITY_NOT_ACTIVE");
   if (now < new Date(capability.issuedAt)) reasons.push("CAPABILITY_NOT_YET_VALID");
   if (now >= new Date(capability.expiresAt)) reasons.push("CAPABILITY_EXPIRED");
+  if (capability.usesRemaining < 1) reasons.push("CAPABILITY_USES_EXHAUSTED");
   if (attempt.agentId !== capability.issuedToAgentId) {
     reasons.push("AGENT_SCOPE_MISMATCH");
   }

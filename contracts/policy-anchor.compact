@@ -1,0 +1,108 @@
+pragma language_version >= 0.22;
+
+import CompactStandardLibrary;
+
+// AgentOS policy anchor.
+//
+// This contract is the public half of AgentOS. It lets an organization prove
+// that an autonomous agent acted under a policy the organization had registered,
+// and that a given decision was anchored exactly once — without publishing the
+// policy, the amount, the counterparty, or which agent acted.
+//
+// What is public on-chain:
+//   - the set of registered policy commitments (as a Merkle root)
+//   - one nullifier per anchored decision
+//   - the outcome tag for that nullifier
+//   - a running count of anchored decisions
+//
+// What never leaves the operator's infrastructure:
+//   - the organization's controller secret
+//   - the policy body and its constraints
+//   - the amount, currency, counterparty and agent identity
+//   - any credential material, which this contract never sees in any form
+//
+// An auditor is given a decision's preimage off-chain, recomputes the nullifier,
+// and checks it is present here. That proves the decision happened under a
+// registered policy without the chain ever learning what the decision was.
+
+export enum DecisionOutcome { APPROVED, EXECUTED }
+
+/// Commitments to every policy version the organization has registered.
+/// Historic roots are retained because anchoring proofs are generated
+/// continuously while policies are registered occasionally; a proof computed
+/// against an earlier root must still verify.
+export ledger policyCommitments: HistoricMerkleTree<16, Bytes<32>>;
+
+/// One entry per anchored decision. Membership is the audit fact.
+export ledger decisionNullifiers: Set<Bytes<32>>;
+
+/// The outcome asserted for each anchored decision.
+export ledger decisionOutcomes: Map<Bytes<32>, DecisionOutcome>;
+
+/// Monotonic count of anchored decisions, cheap for dashboards to read.
+export ledger anchoredDecisions: Counter;
+
+/// Hash-based controller identity. Only the holder of the organization secret
+/// can register policies or anchor decisions.
+export ledger controller: Bytes<32>;
+
+witness organizationSecretKey(): Bytes<32>;
+witness policySecret(): Bytes<32>;
+witness decisionSecret(): Bytes<32>;
+witness policyCommitmentPath(leaf: Bytes<32>): MerkleTreePath<16, Bytes<32>>;
+
+constructor() {
+  controller = disclose(controllerKey(organizationSecretKey()));
+}
+
+/// Registers a policy version. The commitment hides the policy body; only the
+/// organization can produce its preimage.
+export circuit registerPolicy(): Bytes<32> {
+  assert(controller == controllerKey(organizationSecretKey()), "not the controller");
+
+  const commitment = policyCommitment(policySecret());
+  policyCommitments.insert(disclose(commitment));
+
+  return disclose(commitment);
+}
+
+/// Anchors one policy-compliant decision.
+///
+/// The proof establishes three things at once: the caller controls this
+/// organization, the decision was taken under a policy that was registered
+/// here, and this decision has never been anchored before. Nothing about the
+/// decision's content is revealed.
+export circuit anchorDecision(outcome: DecisionOutcome): Bytes<32> {
+  assert(controller == controllerKey(organizationSecretKey()), "not the controller");
+
+  const leaf = policyCommitment(policySecret());
+  const path = policyCommitmentPath(leaf);
+  assert(
+    policyCommitments.checkRoot(merkleTreePathRoot<16, Bytes<32>>(path)),
+    "policy is not registered"
+  );
+
+  const nullifier = disclose(decisionNullifier(decisionSecret()));
+  assert(!decisionNullifiers.member(nullifier), "decision already anchored");
+
+  decisionNullifiers.insert(nullifier);
+  decisionOutcomes.insert(nullifier, disclose(outcome));
+  anchoredDecisions.increment(1);
+
+  return nullifier;
+}
+
+// Domain separators are distinct per purpose so the same organization secret
+// can never yield the same digest in two different roles.
+
+pure circuit controllerKey(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "agentos:controller:v1"), sk]);
+}
+
+pure circuit policyCommitment(secret: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "agentos:policy:v1"), secret]);
+}
+
+pure circuit decisionNullifier(secret: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "agentos:decision:v1"), secret]);
+}
