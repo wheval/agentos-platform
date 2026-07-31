@@ -119,7 +119,9 @@ export default function DocsPage() {
         <p className="text-[#48544f]">
           Supply a stable idempotency key. A retry with the same key returns the
           original receipt instead of paying twice — which matters most exactly
-          when the agent never saw the first response.
+          when the agent never saw the first response. Keys are scoped to your
+          agent, so you never collide with another agent&apos;s key and never see
+          another agent&apos;s receipt.
         </p>
         <CodeBlock
           label="POST /api/v1/capabilities/:id/execute"
@@ -147,6 +149,10 @@ export default function DocsPage() {
             [
               "409 INVALID_STATE",
               "The request is not in a state that permits this operation, e.g. approving a request that was already denied.",
+            ],
+            [
+              "409 IDEMPOTENCY_KEY_REUSED",
+              "The key was already used for a different capability. Keys are scoped to your agent; retrying the same key against the same capability still replays the original result.",
             ],
             [
               "422 VALIDATION_FAILED",

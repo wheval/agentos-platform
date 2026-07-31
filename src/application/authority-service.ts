@@ -45,6 +45,7 @@ export type AuthorityErrorCode =
   | "APPROVER_NOT_AUTHORIZED"
   | "INVALID_STATE"
   | "CAPABILITY_DENIED"
+  | "IDEMPOTENCY_KEY_REUSED"
   | "VALIDATION_FAILED";
 
 export type AuthorityError = {
@@ -457,6 +458,7 @@ export class AuthorityService {
 
       const now = this.#nowIso();
       const events: AuditEvent[] = [];
+
       const capability = CapabilityGrantSchema.parse({
         id: this.#newId("cap"),
         actionRequestId: request.id,
@@ -516,11 +518,36 @@ export class AuthorityService {
     }
 
     return this.#store.runExclusive(async () => {
+      // Scoped to the calling agent. A global lookup would let any
+      // authenticated agent present a key belonging to someone else and
+      // receive that agent's receipt and full request before a single
+      // authorization check ran — and, worse, be told the action succeeded
+      // while their own execution was silently skipped.
+      //
+      // Because the lookup is scoped, a foreign key simply does not resolve:
+      // the caller falls through to normal execution and learns nothing about
+      // whether that key exists elsewhere.
       const existing = await this.#store.getReceiptByIdempotencyKey(
+        input.agentId,
         input.idempotencyKey,
       );
 
       if (existing) {
+        // The agent's own key, but pointed at a different grant. Returning the
+        // stored receipt would confirm an action the caller did not name, so
+        // this fails closed. Retrying the same key against the same capability
+        // — the case idempotency exists for — still replays.
+        if (existing.capabilityId !== input.capabilityId) {
+          return {
+            ok: false as const,
+            error: {
+              code: "IDEMPOTENCY_KEY_REUSED" as const,
+              message:
+                "Idempotency key was already used for a different capability",
+            },
+          };
+        }
+
         const replayed = await this.#store.getActionRequest(existing.actionRequestId);
 
         return replayed
@@ -838,6 +865,7 @@ export class AuthorityService {
       receipts,
       policyId: policy.id,
       windowStart: windowStartIso(now, spendWindow.windowHours),
+      now,
     });
   }
 
