@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f5f2;
+  --foreground: #14231f;
+  --surface: #ffffff;
+  --line: #dde2dc;
+  --muted: #66736e;
+  --accent: #2f6b55;
+  --accent-soft: #dcebe4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #bbd8cb;
+  color: #10241c;
+}
+
+:focus-visible {
+  outline: 3px solid #66a98c;
+  outline-offset: 3px;
+}
+
+.dashboard-grid {
+  background-image:
+    linear-gradient(rgba(39, 75, 62, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(39, 75, 62, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.card-shadow {
+  box-shadow:
+    0 1px 2px rgba(20, 35, 31, 0.03),
+    0 14px 36px rgba(20, 35, 31, 0.045);
+}
