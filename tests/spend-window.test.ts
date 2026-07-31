@@ -11,12 +11,14 @@ const WINDOW_START = isoAt(-60);
 function committed(
   grants: Parameters<typeof computeCommittedSpendMinor>[0]["grants"],
   receipts: Parameters<typeof computeCommittedSpendMinor>[0]["receipts"] = [],
+  now: string = NOW,
 ) {
   return computeCommittedSpendMinor({
     grants,
     receipts,
     policyId: POLICY_ID,
     windowStart: WINDOW_START,
+    now,
   });
 }
 

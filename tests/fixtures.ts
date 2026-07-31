@@ -207,6 +207,8 @@ export type TestHarness = {
 export function buildHarness(
   options: {
     agent?: Agent;
+    /** Extra agents sharing the workspace, for cross-tenant isolation tests. */
+    extraAgents?: Agent[];
     policy?: Policy;
     anchorAccepted?: boolean;
     seedRequests?: ActionRequest[];
@@ -228,7 +230,7 @@ export function buildHarness(
   });
 
   const seed: WorkspaceSeed = {
-    agents: [agent],
+    agents: [agent, ...(options.extraAgents ?? [])],
     policies: [policy],
     actionRequests: options.seedRequests ?? [],
     approvals: [],
