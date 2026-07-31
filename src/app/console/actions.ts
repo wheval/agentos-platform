@@ -175,7 +175,12 @@ export async function saveBlueprintAction(
     return { error: "That flow is not a shape we can store." };
   }
 
-  const { store } = getWorkspace();
+  const { store, organizationId } = getWorkspace();
+
+  if (parsed.data.organizationId !== organizationId) {
+    return { error: "That flow belongs to a different organization." };
+  }
+
   const [policies, agents] = await Promise.all([
     store.listPolicies(),
     store.listAgents(),

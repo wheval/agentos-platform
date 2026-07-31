@@ -27,6 +27,8 @@ export type BlueprintIssueCode =
   | "GATE_WITHOUT_ACTION"
   | "BRANCH_OUTCOME_DUPLICATED"
   | "AGENT_MISSING_PERMISSION"
+  | "AGENT_PAUSED"
+  | "AGENT_UNKNOWN"
   | "AGENT_UNASSIGNED"
   | "NO_ACTION";
 
@@ -218,7 +220,21 @@ export function validateBlueprint(
       (candidate) => candidate.id === blueprint.agentId,
     );
 
-    if (agent) {
+    if (!agent) {
+      issues.push({
+        code: "AGENT_UNKNOWN",
+        severity: "blocking",
+        message: `The assigned agent ${blueprint.agentId} no longer exists. Assign a live agent before publishing.`,
+      });
+    } else {
+      if (agent.status === "paused") {
+        issues.push({
+          code: "AGENT_PAUSED",
+          severity: "blocking",
+          message: `${agent.name} is paused and cannot run a published flow.`,
+        });
+      }
+
       const required = new Set(collectActionKinds(blueprint));
 
       for (const kind of required) {
