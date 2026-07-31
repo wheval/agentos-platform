@@ -409,6 +409,7 @@ export const AgentHandoffSchema = z
   });
 
 export type Agent = z.infer<typeof AgentSchema>;
+export type ActionKind = z.infer<typeof ActionKindSchema>;
 export type Currency = z.infer<typeof CurrencySchema>;
 export type Policy = z.infer<typeof PolicySchema>;
 export type SpendWindow = z.infer<typeof SpendWindowSchema>;
