@@ -204,6 +204,32 @@ describe("blueprint validation", () => {
     );
   });
 
+  it("refuses a flow assigned to an agent that does not exist", () => {
+    const result = validate(
+      blueprint({ steps: [gate, pay], agentId: "agt_missing" }),
+      [policy()],
+      [],
+    );
+
+    expect(result.publishable).toBe(false);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ code: "AGENT_UNKNOWN", severity: "blocking" }),
+    );
+  });
+
+  it("refuses a flow assigned to a paused agent", () => {
+    const result = validate(
+      blueprint({ steps: [gate, pay] }),
+      [policy()],
+      [agent({ status: "paused" })],
+    );
+
+    expect(result.publishable).toBe(false);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ code: "AGENT_PAUSED", severity: "blocking" }),
+    );
+  });
+
   it("refuses a flow with nobody accountable for it", () => {
     expect(codes(blueprint({ steps: [gate, pay], agentId: null }))).toContain(
       "AGENT_UNASSIGNED",

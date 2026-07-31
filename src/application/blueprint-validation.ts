@@ -28,6 +28,8 @@ export type BlueprintIssueCode =
   | "BRANCH_OUTCOME_DUPLICATED"
   | "AGENT_MISSING_PERMISSION"
   | "AGENT_UNASSIGNED"
+  | "AGENT_UNKNOWN"
+  | "AGENT_PAUSED"
   | "NO_ACTION";
 
 export type BlueprintIssue = {
@@ -218,7 +220,21 @@ export function validateBlueprint(
       (candidate) => candidate.id === blueprint.agentId,
     );
 
-    if (agent) {
+    if (!agent) {
+      issues.push({
+        code: "AGENT_UNKNOWN",
+        severity: "blocking",
+        message: `The assigned agent ${blueprint.agentId} does not exist in this workspace.`,
+      });
+    } else {
+      if (agent.status === "paused") {
+        issues.push({
+          code: "AGENT_PAUSED",
+          severity: "blocking",
+          message: `${agent.name} is paused. Resume it before publishing operational intent for it.`,
+        });
+      }
+
       const required = new Set(collectActionKinds(blueprint));
 
       for (const kind of required) {
