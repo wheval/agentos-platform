@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { validateBlueprint } from "@/application/blueprint-validation";
+import { AgentBlueprintSchema } from "@/domain/blueprint";
 import type { Actor } from "@/domain/schemas";
 import { readOperatorSession } from "@/lib/operator-session";
 import { getWorkspace } from "@/lib/workspace";
@@ -151,4 +153,57 @@ export async function revokeCapabilityAction(
   refresh();
 
   return { message: "Authority withdrawn. The grant can no longer be redeemed." };
+}
+
+/**
+ * Saves a blueprint.
+ *
+ * The browser validates on every keystroke for feedback; this re-runs the same
+ * rules against live policy and agent state before anything is stored. A client
+ * that skips the UI, or an operator whose policy was retired mid-edit, gets the
+ * same refusal.
+ */
+export async function saveBlueprintAction(
+  input: unknown,
+  publish: boolean,
+): Promise<ActionState> {
+  await requireOperator();
+
+  const parsed = AgentBlueprintSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return { error: "That flow is not a shape we can store." };
+  }
+
+  const { store, organizationId } = getWorkspace();
+
+  if (parsed.data.organizationId !== organizationId) {
+    return { error: "This flow does not belong to the active workspace." };
+  }
+
+  const [policies, agents] = await Promise.all([
+    store.listPolicies(),
+    store.listAgents(),
+  ]);
+
+  const validation = validateBlueprint({
+    blueprint: parsed.data,
+    policies,
+    agents,
+  });
+
+  if (publish && !validation.publishable) {
+    return { error: "This flow still has blocking issues, so it was not published." };
+  }
+
+  await store.upsertBlueprint({
+    ...parsed.data,
+    organizationId,
+    status: publish ? "published" : "draft",
+    updatedAt: new Date().toISOString(),
+  });
+
+  refresh();
+
+  return { message: publish ? "Published." : "Draft saved." };
 }

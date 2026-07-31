@@ -12,10 +12,12 @@ import type {
   Policy,
   ProofAnchor,
 } from "@/domain/schemas";
+import type { AgentBlueprint } from "@/domain/blueprint";
 
 export type WorkspaceSeed = {
   agents: Agent[];
   policies: Policy[];
+  blueprints: AgentBlueprint[];
   actionRequests: ActionRequest[];
   approvals: Approval[];
   capabilities: CapabilityGrant[];
@@ -39,6 +41,7 @@ export type WorkspaceSeed = {
 export class InMemoryAgentOsStore implements AgentOsStore {
   #agents: Agent[];
   #policies: Policy[];
+  #blueprints: AgentBlueprint[];
   #actionRequests: ActionRequest[];
   #approvals: Approval[];
   #capabilities: CapabilityGrant[];
@@ -53,6 +56,7 @@ export class InMemoryAgentOsStore implements AgentOsStore {
   constructor(seed: WorkspaceSeed) {
     this.#agents = [...seed.agents];
     this.#policies = [...seed.policies];
+    this.#blueprints = [...seed.blueprints];
     this.#actionRequests = [...seed.actionRequests];
     this.#approvals = [...seed.approvals];
     this.#capabilities = [...seed.capabilities];
@@ -99,6 +103,20 @@ export class InMemoryAgentOsStore implements AgentOsStore {
     this.#policies = upsertById(this.#policies, policy);
 
     return policy;
+  }
+
+  async listBlueprints(): Promise<AgentBlueprint[]> {
+    return [...this.#blueprints];
+  }
+
+  async getBlueprint(id: string): Promise<AgentBlueprint | null> {
+    return this.#blueprints.find((blueprint) => blueprint.id === id) ?? null;
+  }
+
+  async upsertBlueprint(blueprint: AgentBlueprint): Promise<AgentBlueprint> {
+    this.#blueprints = upsertById(this.#blueprints, blueprint);
+
+    return blueprint;
   }
 
   async listActionRequests(): Promise<ActionRequest[]> {

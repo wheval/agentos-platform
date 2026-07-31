@@ -117,6 +117,18 @@ request detail, capabilities, audit ledger, proofs, settings. Every mutation is
 a server action that re-checks the session, because a server action is a public
 endpoint.
 
+**Agent builder** (`/console/agents/builder`) — a visual editor for an agent's
+job: what wakes it, what it does, and which policy bounds it before it acts.
+One rule makes it more than a flowchart: **an action that is not downstream of a
+policy gate cannot be published**. The publish button stays disabled and the
+offending card is marked, so "an agent that can pay without a policy" is not a
+configuration an operator can save by accident. Validation runs in the browser
+for feedback and again on the server before anything is stored.
+
+A blueprint describes intent and grants nothing. Authority is still issued per
+request by the `AuthorityService`, against the live policy, capped by the same
+short-lived grant.
+
 **Agent REST API** (`/api/v1`) — `POST /action-requests`, `GET
 /action-requests/:id`, `POST /action-requests/:id/capability`, `GET
 /capabilities`, `POST /capabilities/:id/execute`. Authenticated with per-agent

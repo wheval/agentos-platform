@@ -11,6 +11,7 @@ import type {
   Policy,
   ProofAnchor,
 } from "@/domain/schemas";
+import type { AgentBlueprint } from "@/domain/blueprint";
 
 /**
  * Persistence boundary for the control plane.
@@ -42,6 +43,10 @@ export interface AgentOsStore {
   listPolicies(): Promise<Policy[]>;
   getPolicy(id: string): Promise<Policy | null>;
   upsertPolicy(policy: Policy): Promise<Policy>;
+
+  listBlueprints(): Promise<AgentBlueprint[]>;
+  getBlueprint(id: string): Promise<AgentBlueprint | null>;
+  upsertBlueprint(blueprint: AgentBlueprint): Promise<AgentBlueprint>;
 
   listActionRequests(): Promise<ActionRequest[]>;
   getActionRequest(id: string): Promise<ActionRequest | null>;
