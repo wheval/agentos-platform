@@ -232,6 +232,7 @@ export function buildHarness(
   const seed: WorkspaceSeed = {
     agents: [agent, ...(options.extraAgents ?? [])],
     policies: [policy],
+    blueprints: [],
     actionRequests: options.seedRequests ?? [],
     approvals: [],
     capabilities: options.seedCapabilities ?? [],
