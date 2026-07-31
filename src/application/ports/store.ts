@@ -56,7 +56,20 @@ export interface AgentOsStore {
   upsertCapability(capability: CapabilityGrant): Promise<CapabilityGrant>;
 
   listReceipts(): Promise<ExecutionReceipt[]>;
-  getReceiptByIdempotencyKey(key: string): Promise<ExecutionReceipt | null>;
+  /**
+   * Idempotency keys are scoped to the agent that issued them, never global.
+   *
+   * The scope is part of the signature rather than a check the caller is
+   * trusted to remember, because forgetting it is a disclosure bug: a global
+   * lookup lets any authenticated agent present another agent's key and be
+   * handed that agent's receipt — amount, counterparty and all — before any
+   * authorization runs. Agents pick their own keys, so collisions across
+   * agents are expected and must resolve to different receipts.
+   */
+  getReceiptByIdempotencyKey(
+    agentId: string,
+    key: string,
+  ): Promise<ExecutionReceipt | null>;
   appendReceipt(receipt: ExecutionReceipt): Promise<ExecutionReceipt>;
 
   listAuditEvents(): Promise<AuditEvent[]>;

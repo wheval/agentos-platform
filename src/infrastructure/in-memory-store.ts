@@ -150,10 +150,14 @@ export class InMemoryAgentOsStore implements AgentOsStore {
   }
 
   async getReceiptByIdempotencyKey(
+    agentId: string,
     key: string,
   ): Promise<ExecutionReceipt | null> {
     return (
-      this.#receipts.find((receipt) => receipt.idempotencyKey === key) ?? null
+      this.#receipts.find(
+        (receipt) =>
+          receipt.agentId === agentId && receipt.idempotencyKey === key,
+      ) ?? null
     );
   }
 
