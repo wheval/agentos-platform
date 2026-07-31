@@ -11,6 +11,7 @@ import {
   ExecutionReceiptSchema,
   PolicySchema,
 } from "@/domain/schemas";
+import { AgentBlueprintSchema } from "@/domain/blueprint";
 import { generateApiKey } from "@/lib/api-keys";
 
 export const DEMO_ORGANIZATION_ID = "org_northwind";
@@ -613,10 +614,89 @@ export function buildSeededWorkspace(now = new Date()): SeededWorkspace {
     });
   });
 
+  // Demo data. Mirrors the research-tools policy, which auto-approves below
+  // $5 and escalates above it — the split the branching node exists to show.
+  const blueprints = [
+    AgentBlueprintSchema.parse({
+      id: "bp_research_tools",
+      organizationId: DEMO_ORGANIZATION_ID,
+      name: "Research tool top-ups",
+      summary:
+        "Keeps the research agent's paid data sources topped up without handing it a card, escalating anything above the auto-approval line.",
+      agentId: "agt_research",
+      status: "published",
+      trigger: {
+        kind: "schedule",
+        label: "Every weekday at 08:00",
+      },
+      steps: [
+        {
+          kind: "step",
+          id: "nd_check_credits",
+          label: "Check remaining API credits",
+          detail:
+            "Reads usage from the connected data providers and decides whether a top-up is needed.",
+        },
+        {
+          kind: "policy_gate",
+          id: "nd_gate",
+          policyId: "pol_research_tools",
+        },
+      ],
+      branching: {
+        id: "nd_split",
+        label: "Policy decision",
+        branches: [
+          {
+            id: "br_auto",
+            outcome: "auto_approved",
+            label: "Under $5",
+            steps: [
+              {
+                kind: "action",
+                id: "nd_pay_small",
+                actionKind: "capped_payment",
+                label: "Top up the provider",
+              },
+              {
+                kind: "notify",
+                id: "nd_notify_manager",
+                audience: "manager",
+                label: "Post the receipt to the manager",
+              },
+            ],
+          },
+          {
+            id: "br_review",
+            outcome: "requires_approval",
+            label: "$5 and above",
+            steps: [
+              {
+                kind: "notify",
+                id: "nd_notify_approvers",
+                audience: "approvers",
+                label: "Send to the approvals inbox",
+              },
+              {
+                kind: "action",
+                id: "nd_pay_large",
+                actionKind: "capped_payment",
+                label: "Top up once approved",
+              },
+            ],
+          },
+        ],
+      },
+      createdAt: at(-days(9)),
+      updatedAt: at(-days(2)),
+    }),
+  ];
+
   return {
     seed: {
       agents,
       policies,
+      blueprints,
       actionRequests,
       approvals,
       capabilities,
