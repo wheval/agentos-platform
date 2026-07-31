@@ -9,6 +9,7 @@ const NAV = [
   { href: "/console/requests", label: "Requests" },
   { href: "/console/capabilities", label: "Capabilities" },
   { href: "/console/agents", label: "Agents" },
+  { href: "/console/agents/builder", label: "Builder" },
   { href: "/console/policies", label: "Policies" },
   { href: "/console/proofs", label: "Proofs" },
   { href: "/console/audit", label: "Audit ledger" },
