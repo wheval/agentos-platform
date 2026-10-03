@@ -19,7 +19,10 @@ vi.mock("@/lib/workspace", () => ({
   getWorkspace: vi.fn(),
 }));
 
-import { saveBlueprintAction } from "@/app/console/actions";
+import {
+  createAgentDraftAction,
+  saveBlueprintAction,
+} from "@/app/console/actions";
 import { getWorkspace } from "@/lib/workspace";
 
 const NOW = "2026-07-31T12:00:00.000Z";
@@ -128,5 +131,81 @@ describe("saveBlueprintAction", () => {
         status: "draft",
       }),
     ]);
+  });
+});
+
+describe("createAgentDraftAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("creates only a paused agent and draft blueprint from a supported template", async () => {
+    const store = setWorkspace();
+
+    const result = await createAgentDraftAction({
+      name: "Treasury review agent",
+      jobDescription:
+        "Prepares bounded treasury requests for an accountable manager to review.",
+      managerId: "usr_maya",
+      riskTier: "high",
+      permission: "capped_payment",
+      template: "bounded_payment",
+    });
+
+    expect(result).toEqual({
+      message: "Draft configuration created. The agent remains paused.",
+      agentId: expect.stringMatching(/^agt_/),
+      blueprintId: expect.stringMatching(/^bp_/),
+    });
+
+    const createdAgent = (await store.listAgents()).find(
+      (agent) => agent.id === result.agentId,
+    );
+    const createdBlueprint = (await store.listBlueprints()).find(
+      (candidate) => candidate.id === result.blueprintId,
+    );
+
+    expect(createdAgent).toEqual(
+      expect.objectContaining({
+        status: "paused",
+        managerId: "usr_maya",
+        permissions: ["capped_payment"],
+      }),
+    );
+    expect(createdBlueprint).toEqual(
+      expect.objectContaining({
+        organizationId: ORG_ID,
+        agentId: result.agentId,
+        status: "draft",
+        steps: [
+          expect.objectContaining({ kind: "policy_gate" }),
+          expect.objectContaining({ kind: "action" }),
+          expect.objectContaining({ kind: "notify" }),
+        ],
+      }),
+    );
+
+    const publish = await saveBlueprintAction(createdBlueprint, true);
+    expect(publish.error).toBe(
+      "This flow still has blocking issues, so it was not published.",
+    );
+  });
+
+  it("rejects invalid accountability data without mutating the store", async () => {
+    const store = setWorkspace();
+
+    const result = await createAgentDraftAction({
+      name: "Treasury review agent",
+      jobDescription:
+        "Prepares bounded treasury requests for an accountable manager to review.",
+      managerId: "usr_unknown",
+      riskTier: "high",
+      permission: "capped_payment",
+      template: "bounded_payment",
+    });
+
+    expect(result.error).toMatch(/accountability owner/i);
+    expect(await store.listBlueprints()).toEqual([]);
+    expect(await store.listAgents()).toHaveLength(1);
   });
 });

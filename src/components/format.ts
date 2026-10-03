@@ -1,6 +1,7 @@
 import type { Tone } from "@/components/ui";
 import type {
   ActionRequestState,
+  CapabilityGrant,
   CapabilityStatus,
   Currency,
 } from "@/domain/schemas";
@@ -80,6 +81,15 @@ export function capabilityTone(status: CapabilityStatus): Tone {
     default:
       return "neutral";
   }
+}
+
+export function effectiveCapabilityStatus(
+  capability: Pick<CapabilityGrant, "expiresAt" | "status">,
+  now = new Date(),
+): CapabilityStatus {
+  return capability.status === "active" && new Date(capability.expiresAt) <= now
+    ? "expired"
+    : capability.status;
 }
 
 export function outcomeTone(outcome: "allowed" | "denied" | "info"): Tone {
